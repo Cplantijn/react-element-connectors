@@ -1,3 +1,16 @@
-body {
-  background: white;
+.rec-workspace {
+  position: relative;
+}
+.rec-svg-overlay {
+  position: absolute;
+  pointer-events: none;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+}
+.rec-node {
+  margin-top: 6rem;
+  text-align: center;
+  border: 1px solid black;
 }
