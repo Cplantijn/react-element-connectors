@@ -1,10 +1,10 @@
 import { Component, PropTypes } from 'react';
 
-export default class Node extends Component {
+export default class ConnectNode extends Component {
   render() {
     const { children = null } = this.props;
     return (
-      <div className="rec-node">
+      <div {...this.props}>
         { children }
       </div>
     );

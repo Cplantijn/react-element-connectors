@@ -1,2 +1,2 @@
-export Node from './Node';
+export ConnectNode from './ConnectNode';
 export Workspace from './Workspace';
