@@ -1,39 +1,39 @@
 import { Component, PropTypes, Children, cloneElement, isValidElement } from 'react';
-import { findDOMNode } from 'react-dom';
-import Connectors from './Connectors';
-import shortId from 'short-id';
 import Resizable from 'react-component-resizable';
+import Connectors from './Connectors';
 
 export default class Workspace extends Component {
   constructor(props) {
     super(props);
     this._calculatePositions = this._calculatePositions.bind(this);
+    this._nodes = [];
     this.state = {
       nodeMap: null
     };
   }
 
+  componentDidMount() {
+    window.addEventListener('resize', this._calculatePositions);
+    this._calculatePositions();
+  }
+
+  componentWillUmount() {
+    window.removeEventListener('resize', this._calculatePositions);
+  }
+
   _calculatePositions() {
-    const { children } = this.props;
     const nodeMap = [];
 
-    Object.keys(this.refs)
-      .forEach((key) => {
-        const boundingBox = findDOMNode(this.refs[key]).getBoundingClientRect();
-        let id = 'connect';
-
-        if (this.refs[key].props.id) {
-          id = this.refs[key].props.id;
-        }
-        console.log(id, boundingBox)
-        nodeMap.push({
-          key,
-          top: boundingBox.top,
-          left: boundingBox.left,
-          height: boundingBox.height,
-          width: boundingBox.width
-        });
+    this._nodes.forEach((node) => {
+      const boundingBox = node.getBoundingClientRect();
+      nodeMap.push({
+        element: node,
+        top: boundingBox.top,
+        left: boundingBox.left,
+        height: boundingBox.height,
+        width: boundingBox.width
       });
+    });
 
     this.setState({
       nodeMap
@@ -41,15 +41,25 @@ export default class Workspace extends Component {
   }
 
   _recursiveCloneChildren(children) {
-    return Children.map(children, (child, key) => {
+    return Children.map(children, (child) => {
       if (isValidElement(child)) {
         let newProps = {};
 
         if (child.type.displayName === 'ConnectNode') {
-          newProps = { ref: shortId.generate() };
+          newProps = {
+            ref: (c) => {
+              if (c && c._node) {
+                if (c._svgContainer) {
+                  this._nodes.push(c._svgContainer);
+                }
+                this._nodes.push(c._node);
+              }
+            }
+          };
         } else if (child.props.children) {
           newProps.children = this._recursiveCloneChildren(child.props.children);
         }
+
         return cloneElement(child, newProps);
       }
       return child;
@@ -57,22 +67,32 @@ export default class Workspace extends Component {
   }
 
   render() {
-    const { children } = this.props;
+    const {
+      children,
+      animationDelay = 0,
+      animationDuration = 1000,
+      animationEasing = 'ease-in-out',
+      strokeWidth = 1,
+      strokeColor = '#000',
+      strokeOpacity = 1,
+      animate = true
+    } = this.props;
+
+    this._nodes = [];
     const renderedChildren = this._recursiveCloneChildren(children);
     return (
-      <Resizable
-        className="rec-workspace"
-        onResize={this._calculatePositions}
-      >
+      <div className="rec-workspace">
         <Connectors
-          animate
-          animationDuration={360}
-          animationEasing="linear"
-          strokeWidth={1}
           nodeMap={this.state.nodeMap}
+          animationDelay={animationDelay}
+          animationDuration={animationDuration}
+          animationEasing={animationEasing}
+          strokeWidth={strokeWidth}
+          strokeColor={strokeColor}
+          animate={animate}
         />
         { renderedChildren }
-      </Resizable>
+      </div>
     );
   }
 }

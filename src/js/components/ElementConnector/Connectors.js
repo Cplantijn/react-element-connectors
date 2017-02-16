@@ -1,4 +1,4 @@
-import { Component, PropTypes } from 'react';
+import { Component, PropTypes, createElement } from 'react';
 import shortId from 'short-id';
 
 export default class Connectors extends Component {
@@ -6,6 +6,7 @@ export default class Connectors extends Component {
     super(props);
     this._drawLines = this._drawLines.bind(this);
     this._animateLines = this._animateLines.bind(this);
+    this._animatePath = this._animatePath.bind(this);
     this._svgContainer = null;
     this._paths = [];
   }
@@ -32,13 +33,25 @@ export default class Connectors extends Component {
     }
   }
 
-  _animateLines(startIndex = 0, adding = true) {
-    const {
-      animate = true,
-      animationDuration = 400,
-      animationDelay = 0,
-      animationEasing = 'ease-in-out'
-    } = this.props;
+  _animatePath(path, delayQueue, reverse = false) {
+    const { animate, animationDuration, animationEasing } = this.props;
+    const length = path.getTotalLength();
+    path.style.transition = 'none';
+    path.style.strokeDasharray = `${length} ${length}`;
+    if (reverse) {
+      path.style.strokeDashoffset = 0 - length;
+    } else {
+      path.style.strokeDashoffset = length;
+    }
+    path.getBoundingClientRect();
+    path.style.transition = `stroke-dashoffset ${animationDuration / 1000}s ${animationEasing}`;
+    setTimeout(() => {
+      path.style.strokeDashoffset = 0;
+    }, delayQueue);
+  }
+
+  _animateLines(startIndex = 0) {
+    const { animate, animationDelay, animationDuration } = this.props;
 
     if (!this._svgContainer || !animate || !this._paths.length) {
       return false;
@@ -49,29 +62,22 @@ export default class Connectors extends Component {
 
     validPaths.forEach((path, index) => {
       if (index >= startIndex) {
-        const length = path.getTotalLength();
-        path.style.transition = path.style.transition = 'none';
-        path.style.strokeDasharray = `${length} ${length}`;
-        path.style.strokeDashoffset = length;
-        path.getBoundingClientRect();
-        path.style.transition = path.style.transition = `stroke-dashoffset ${animationDuration / 1000}s ${animationEasing}`;
-
-        setTimeout(() => {
-          path.style.strokeDashoffset = 0;
-        }, delayQueue);
-        delayQueue += animationDuration;
+        if (Array.isArray(path)) {
+          path.forEach((p, index) => {
+            const reverse = !(index === 0 || index % 2 === 0);
+            this._animatePath(p, delayQueue, reverse);
+          });
+        } else {
+          this._animatePath(path, delayQueue);
+        }
       }
+
+      delayQueue += animationDuration;
     });
   }
 
   _drawLines() {
-    const {
-      nodeMap = null,
-      strokeWidth = 1,
-      strokeColor = 'black',
-      strokeOpacity = 1,
-      lineFill = 'transparent',
-    } = this.props;
+    const { nodeMap = null, strokeWidth, strokeColor, strokeOpacity, lineFill } = this.props;
 
     if (!nodeMap || !this._svgContainer) {
       return null;
@@ -81,13 +87,12 @@ export default class Connectors extends Component {
     const containerTop = this._svgContainer.getBoundingClientRect().top;
 
     return nodeMap.map((node, index) => {
-      if (index < nodeMap.length - 1) {
+      if (index < nodeMap.length - 1 && node.element.tagName !== 'svg') {
         const nextNode = nodeMap[index + 1];
         const startPosX = node.width / 2;
-        const startPosY = (node.top - containerTop) + node.height;
         const endPosX = nextNode.width / 2;
-        const endPosY = Math.round(startPosY + (nextNode.top - node.top - nextNode.height));
-        console.log('nextNode', nextNode.top, nextNode.height);
+        const startPosY = (node.top - containerTop) + node.height;
+        const endPosY = nextNode.top - containerTop;
         const d = `M${startPosX},${startPosY} ${endPosX},${endPosY}`;
 
         return (
@@ -99,10 +104,25 @@ export default class Connectors extends Component {
             opacity={strokeOpacity}
             fill={lineFill}
             ref={(path) => {
-              this._paths.push(path);
+              this._paths[index] = path;
             }}
           />
         );
+      } else if (node.element.tagName === 'svg') {
+        let path = [];
+        if (node.element.children.length) {
+          if (node.element.children.length === 2
+            && ['circle', 'rect'].indexOf(node.element.children[0].tagName) > -1
+            && ['circle', 'rect'].indexOf(node.element.children[1].tagName) > -1) {
+              path = [];
+              path.push(node.element.children[0], node.element.children[1]);
+            } else {
+              path = node.element.children[0];
+            }
+        }
+        if (path) {
+          this._paths[index] = path;
+        }
       }
     });
   }

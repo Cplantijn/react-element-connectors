@@ -1,6 +1,7 @@
 .rec-workspace {
   position: relative;
 }
+
 .rec-svg-overlay {
   position: absolute;
   pointer-events: none;
@@ -9,8 +10,17 @@
   height: 100%;
   width: 100%;
 }
+
 .rec-node {
-  border: 1px solid black;
   margin-top: 6rem;
-  display: block;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  &.draw-outline {
+    &>svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+  }
 }
