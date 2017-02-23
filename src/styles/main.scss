@@ -21,6 +21,15 @@
       position: absolute;
       top: 0;
       left: 0;
+      overflow: visible;
+      &::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        height: 100%;
+        width: 1px;
+        background-color: red
+      }
     }
   }
 }

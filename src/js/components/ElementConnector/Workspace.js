@@ -1,5 +1,6 @@
 import { Component, PropTypes, Children, cloneElement, isValidElement } from 'react';
-import Resizable from 'react-component-resizable';
+import $ from 'jquery';
+import classnames from 'classnames';
 import Connectors from './Connectors';
 
 export default class Workspace extends Component {
@@ -7,6 +8,7 @@ export default class Workspace extends Component {
     super(props);
     this._calculatePositions = this._calculatePositions.bind(this);
     this._nodes = [];
+    this._workspace = null;
     this.state = {
       nodeMap: null
     };
@@ -21,17 +23,34 @@ export default class Workspace extends Component {
     window.removeEventListener('resize', this._calculatePositions);
   }
 
+  componentDidUpdate(oldProps) {
+    if (oldProps.children.length !== this.props.children.length) {
+      this._calculatePositions();
+    }
+  }
+
   _calculatePositions() {
+    const { startAnchor = null } = this.props;
     const nodeMap = [];
+    if (startAnchor) {
+      nodeMap.push({
+        element: this._workspace,
+        top: $(this._workspace).offset().top,
+        left: $(this._workspace).offset().left,
+        height: $(this._workspace).outerHeight(),
+        width: $(this._workspace).outerWidth(),
+        startAnchor
+      });
+    }
 
     this._nodes.forEach((node) => {
-      const boundingBox = node.getBoundingClientRect();
       nodeMap.push({
         element: node,
-        top: boundingBox.top,
-        left: boundingBox.left,
-        height: boundingBox.height,
-        width: boundingBox.width
+        top: $(node).offset().top,
+        left: $(node).offset().left,
+        height: $(node).outerHeight(),
+        width: $(node).outerWidth(),
+        startAnchor: null
       });
     });
 
@@ -44,8 +63,7 @@ export default class Workspace extends Component {
     return Children.map(children, (child) => {
       if (isValidElement(child)) {
         let newProps = {};
-
-        if (child.type.displayName === 'ConnectNode') {
+        if (child.type.name === 'ConnectNode') {
           newProps = {
             ref: (c) => {
               if (c && c._node) {
@@ -69,19 +87,26 @@ export default class Workspace extends Component {
   render() {
     const {
       children,
+      Component = 'div',
       animationDelay = 0,
-      animationDuration = 1000,
+      animationDuration = 460,
+      className,
       animationEasing = 'ease-in-out',
-      strokeWidth = 1,
-      strokeColor = '#000',
+      strokeWidth = 2,
+      strokeColor = '#888',
       strokeOpacity = 1,
       animate = true
     } = this.props;
 
+    const cls = classnames({
+      'rec-workspace': true
+    }, className)
     this._nodes = [];
     const renderedChildren = this._recursiveCloneChildren(children);
     return (
-      <div className="rec-workspace">
+      <Component
+        ref={w => this._workspace = w}
+        className={cls}>
         <Connectors
           nodeMap={this.state.nodeMap}
           animationDelay={animationDelay}
@@ -92,7 +117,7 @@ export default class Workspace extends Component {
           animate={animate}
         />
         { renderedChildren }
-      </div>
+      </Component>
     );
   }
 }

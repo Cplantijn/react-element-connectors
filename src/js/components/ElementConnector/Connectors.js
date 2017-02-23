@@ -21,12 +21,11 @@ export default class Connectors extends Component {
   componentDidUpdate(oldProps) {
     const { nodeMap: oldNodeMap = null } = oldProps;
     const { nodeMap = null } = this.props;
-
     if (oldNodeMap && nodeMap) {
       const oldNodeLen = Object.keys(oldNodeMap).length;
       const currentNodeLen = Object.keys(nodeMap).length;
       if (currentNodeLen !== oldNodeLen) {
-        this._animateLines(oldNodeLen - 1, currentNodeLen > oldNodeLen);
+        this._animateLines(oldNodeLen - 1);
       }
     } else if (!oldNodeMap && nodeMap) {
       this._animateLines();
@@ -34,8 +33,15 @@ export default class Connectors extends Component {
   }
 
   _animatePath(path, delayQueue, reverse = false) {
-    const { animate, animationDuration, animationEasing } = this.props;
-    const length = path.getTotalLength();
+    const { animate, animationDuration, animationEasing, strokeWidth } = this.props;
+
+    let length = 0;
+    if (path.nodeName === 'circle') {
+      length = Math.PI * (Number(path.attributes.r.value)) * 2;
+    } else if (path.nodeName === 'path') {
+      length = path.getTotalLength();
+    }
+
     path.style.transition = 'none';
     path.style.strokeDasharray = `${length} ${length}`;
     if (reverse) {
@@ -59,7 +65,6 @@ export default class Connectors extends Component {
 
     let delayQueue = animationDelay;
     const validPaths = this._paths.filter(Boolean);
-
     validPaths.forEach((path, index) => {
       if (index >= startIndex) {
         if (Array.isArray(path)) {
@@ -70,30 +75,44 @@ export default class Connectors extends Component {
         } else {
           this._animatePath(path, delayQueue);
         }
+        delayQueue += animationDuration;
       }
-
-      delayQueue += animationDuration;
     });
   }
 
   _drawLines() {
-    const { nodeMap = null, strokeWidth, strokeColor, strokeOpacity, lineFill } = this.props;
-
+    const { nodeMap = null, strokeWidth, strokeColor, strokeOpacity, lineFill = 'none' } = this.props;
     if (!nodeMap || !this._svgContainer) {
       return null;
     }
 
-    this._paths = [];
-    const containerTop = this._svgContainer.getBoundingClientRect().top;
 
+    this._paths = [];
+
+    const svgContainerDimens = this._svgContainer.getBoundingClientRect();
     return nodeMap.map((node, index) => {
       if (index < nodeMap.length - 1 && node.element.tagName !== 'svg') {
+        let instructions, startPosX, startPosY, endPosX, endPosY;
         const nextNode = nodeMap[index + 1];
-        const startPosX = node.width / 2;
-        const endPosX = nextNode.width / 2;
-        const startPosY = (node.top - containerTop) + node.height;
-        const endPosY = nextNode.top - containerTop;
-        const d = `M${startPosX},${startPosY} ${endPosX},${endPosY}`;
+
+        switch (node.startAnchor) {
+          case 'top-right':
+            startPosX = (node.left - svgContainerDimens.left) + node.width;
+            startPosY = node.top - svgContainerDimens.top;
+
+            const nextTopXOffset = (nextNode.width / 2) + (nextNode.left - svgContainerDimens.left) - node.width;
+            endPosY = nextNode.top - svgContainerDimens.top;
+            instructions = `${startPosX},${startPosY}h${nextTopXOffset}v${endPosY}`;
+            break;
+          default:
+            startPosX = (node.width / 2) + (node.left - svgContainerDimens.left);
+            startPosY = (node.top - svgContainerDimens.top) + node.height;
+            endPosX = (nextNode.width / 2) + (nextNode.left - svgContainerDimens.left);
+            endPosY = nextNode.top - svgContainerDimens.top;
+            instructions = `${startPosX},${startPosY} ${endPosX},${endPosY}`;
+        }
+
+        const d = `M${instructions}`;
 
         return (
           <path
@@ -114,11 +133,11 @@ export default class Connectors extends Component {
           if (node.element.children.length === 2
             && ['circle', 'rect'].indexOf(node.element.children[0].tagName) > -1
             && ['circle', 'rect'].indexOf(node.element.children[1].tagName) > -1) {
-              path = [];
-              path.push(node.element.children[0], node.element.children[1]);
-            } else {
-              path = node.element.children[0];
-            }
+            path = [];
+            path.push(node.element.children[0], node.element.children[1]);
+          } else {
+            path = node.element.children[0];
+          }
         }
         if (path) {
           this._paths[index] = path;
@@ -131,11 +150,8 @@ export default class Connectors extends Component {
     const connectors = this._drawLines();
     return (
       <svg
-        ref={(container) => {
-          this._svgContainer = container;
-        }}
         className="rec-svg-overlay"
-      >
+        ref={container => this._svgContainer = container }>
         { connectors }
       </svg>
     );
